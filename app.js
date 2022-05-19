@@ -1,9 +1,9 @@
-// Include Nodejs net module.
+// Include Nodejs net module, required to create TCP server listener
 const Net = require('net');
+
 // The port on which the server is listening.
 const port = 39993;
 
-// Use net.createServer() in your code. This is just for illustration purpose.
 // Create a new TCP server.
 const server = new Net.Server();
 
