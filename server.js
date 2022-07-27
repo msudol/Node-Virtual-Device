@@ -1,65 +1,20 @@
-// Include Nodejs net module, required to create TCP server listener
+// Include Nodejs net module, required to create TCP server listener (Built-in with node)
 const Net = require('net');
 
-// Import devices.js 
-const devices = require('./devices.js');
+// import lib.js - library of functions for user
+const lib = require("./lib");
 
-// basic uuid function to give sockets a unique ID 
-var UUID = function() {
-    var dt = new Date().getTime();
-    var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = (dt + Math.random()*16)%16 | 0;
-        dt = Math.floor(dt/16);
-        return (c=='x' ? r :(r&0x3|0x8)).toString(16);
-    });
-    return uuid;
-};
-
-// Random Number Generator (default 0-100)
-var getRand = function(x, y) {	
-	min = Math.ceil(x) || 0;
-	max = Math.floor(y) || 100;
-	return Math.floor(Math.random() * (max - min + 1) + min);
-};
-
-// Random Boolean Generator
-var getBool = function() {
-	return Math.random() < 0.5;
-};
-
-// Random Chance Generator (default 10%)
-var getChance = function(x) {	
-	var min = Math.ceil(x) || 10;
-	return Math.round(100 * Math.random()) < min;
-};
-
-// helper function to convert a json to CSV - untested
-var ConvertToCSV = function(objArray) {
-	var array = typeof objArray != 'object' ? JSON.parse(objArray) : objArray;
-	var str = '';
-
-	for (var i = 0; i < array.length; i++) {
-		var line = '';
-		for (var index in array[i]) {
-			if (line != '') line += ','
-
-			line += array[i][index];
-		}
-
-		str += line + '\r\n';
-	}
-
-	return str;
-}
-
-
-
+// Import devices.js - modify for your requirements
+const devices = require('./devices');
 
 // data return function - this still needs some work to emulate many different devices and data formats
+// this is called on an interval for each client connection to the a server. 
 var dataGen = function(d) {
 	
+	// return value as an array
 	var retVal = [];
 	
+	// loop throught the device's data settings
 	for (data in d.data) {
 	
 		// create an object to store results, work in progess.  
@@ -69,27 +24,30 @@ var dataGen = function(d) {
 		val.name = d.data[data].name;
 	
 		// range will choose an integer between a min/max value, it also has a chance to go outside of the range if desired.
+		// maybe chance this routine from if/else to case/switch for performance
+
 		if (d.data[data].dataType == "range") {
+			var min, max;
 					
 			// alternate range from device config by chance percentage to test tolerances
-			if (getChance(d.data[data].chance)) {
-				var min = d.data[data].xrange[0];
-				var max = d.data[data].xrange[1];
+			if (lib.getChance(d.data[data].chance)) {
+				min = d.data[data].xrange[0];
+				max = d.data[data].xrange[1];
 			}
 			// otherwise normal range
 			else {
-				var min = d.data[data].range[0];
-				var max = d.data[data].range[1];
+				min = d.data[data].range[0];
+				max = d.data[data].range[1];
 			}
 			
-			val.value = getRand(min, max);
+			val.value = lib.getRand(min, max);
 			retVal.push(val);
 		}
 		
 		// simply returns true or false
 		else if (d.data[data].dataType == "boolean") {
 			
-			val.value = getBool();
+			val.value = lib.getBool();
 			retVal.push(val);
 			
 		}
@@ -107,13 +65,17 @@ var dataGen = function(d) {
 		}
 		
 	}
-	//console.log(JSON.stringify(retVal));
+	// spammy, uncomment for debugging
+	// console.log(JSON.stringify(retVal));
+	//TODO: build actually logging/debugging functionality
 	
+
+	// Current formats that the data can be output to. Some other options might be YAML, XML, or PLC specific.
 	if (d.driver == "JSON") {
 		return JSON.stringify(retVal); 
 	}
 	else if (d.driver = "CSV") {
-		return ConvertToCSV(JSON.stringify(retVal));
+		return lib.ConvertToCSV(JSON.stringify(retVal));
 	}
 	else {
 		return retVal;
@@ -142,7 +104,7 @@ var createServer = function(d) {
 	d.server.on('connection', function(socket) {
 		
 		// for tracking purposes generate an ID for this socket
-		const id = UUID();
+		const id = lib.UUID();
 		
 		console.log(`A new connection has been established to ${d.name} with ID ${id}`);
 
@@ -185,7 +147,9 @@ var createServer = function(d) {
 	
 };
 
-// loop through devices from devices.js and create a TCP server for each.
+
+// Main function - loop through devices from devices.js and create a TCP server for each. 
+// Note - error will throw if two devices try to bind the same port.
 for (device in devices) {
 	
 	var d = devices[device];
